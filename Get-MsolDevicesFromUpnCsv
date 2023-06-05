@@ -1,0 +1,43 @@
+Connect-MsolService
+
+$TimeStamp = Get-Date -Format "yyyyMMddTHHmmssffff"
+$CSVOutputPath = "$PSScriptRoot\Get-MsolDevicesFromUpnCsv-$TimeStamp.csv"
+
+[void] [System.Reflection.Assembly]::LoadWithPartialName("System.Drawing") 
+[void] [System.Reflection.Assembly]::LoadWithPartialName("System.Windows.Forms") 
+$OpenFileDialog = New-Object System.Windows.Forms.OpenFileDialog
+$OpenFileDialog.initialDirectory = $PSScriptRoot
+$OpenFileDialog.filter = "CSV (*.csv)| *.csv"
+$OpenFileDialog.ShowDialog() | Out-Null
+$OpenFileDialog.filename
+$CSVImportPath = $OpenFileDialog.filename
+$CSVImport = Import-Csv -Path $CSVImportPath
+
+$CSVOutput = @()
+foreach ($User in $CSVImport) {
+    $UPN  = $User.UserPrincipalName
+    $Devices = Get-MsolDevice -RegisteredOwnerUpn $UPN
+
+    foreach ($Device in $Devices) {
+        $CSVOutput += New-Object -TypeName psobject -Property @{
+            UserPrincipalName = $UPN
+            DisplayName = $Device.DisplayName
+            DeviceOsType = $Device.DeviceOsType
+            DeviceOsVersion = $Device.DeviceOsVersion
+            DeviceTrustType = $Device.DeviceTrustType
+            DeviceTrustLevel = $Device.DeviceTrustLevel
+            Enabled = $Device.Enabled
+            ObjectId = $Device.ObjectId
+            DeviceId = $Device.DeviceId
+            ApproximateLastLogon = $Device.ApproximateLastLogon
+            DirSyncEnabled = $Device.DirSyncEnabled
+            LastDirSyncTime = $Device.LastDirSyncTime
+        }
+    }
+}
+
+
+$CSVOutput `
+    | Select UserPrincipalName, DisplayName, DeviceOsType, DeviceOsVersion, DeviceTrustType, DeviceTrustLevel, Enabled, ObjectId, DeviceId, ApproximateLastLogon, DirSyncEnabled, LastDirSyncTime  `
+    | Sort UserPrincipalName, Enabled, DeviceOsType, DeviceOsVersion, DisplayName, DeviceTrustType, DeviceTrustLevel `
+    | Export-Csv -Path $CSVOutputPath -NoTypeInformation
